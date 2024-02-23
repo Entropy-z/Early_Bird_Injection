@@ -1,18 +1,11 @@
 # Early Bird Injection
 
-Loader in Rust and Cpp using Early Bird technique for execution shellcode.
+Loader in Cpp using Early Bird technique for execution shellcode.
 
 ## Components: 
 - Compite Time API Hashing
-- String Hashing
-- IAT Obfuscation
+- Compile Time String Hashing
+- Custom Functions(GetProcAddress, GetModuleHandle, memcpy, memset, strlen, strcpy, strcat, zeromemory)
+- IAT Obfuscation(GetProcAddress, GetModuleHandle)
 - Compiled Without CRT Library
-- Custom Function
 
-## Future:
-- Payload Execution Control
-- Payload Encryption(AES)
-- Brute Force Descryption
-- DRM
-- Anti-VM/Sandbox
-- Anti-Debug
